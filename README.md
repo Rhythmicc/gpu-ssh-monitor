@@ -3,6 +3,8 @@
 Read-only GPU/server monitor over SSH. Users connect with a terminal and see a
 fixed-size TUI dashboard composed from `nvitop` and `btop`.
 
+![gpu-ssh-monitor preview](assets/monitor.webp)
+
 ## Features
 
 - SSH entrypoint powered by Wish
