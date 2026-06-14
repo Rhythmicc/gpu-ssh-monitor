@@ -1,0 +1,18 @@
+{
+  "name": "gpu-ssh-monitor",
+  "version": "0.1.0",
+  "license": "MIT",
+  "scripts": {
+    "build": "go build -o gpu-ssh-monitor ./cmd/wish-monitor",
+    "start": "./gpu-ssh-monitor",
+    "start:ssh": "./gpu-ssh-monitor"
+  },
+  "dependencies": {
+    "@xterm/addon-serialize": "^0.14.0",
+    "@xterm/headless": "^6.0.0",
+    "node-pty": "^1.1.0"
+  },
+  "trustedDependencies": [
+    "node-pty"
+  ]
+}

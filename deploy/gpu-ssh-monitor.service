@@ -1,0 +1,22 @@
+[Unit]
+Description=Read-only nvitop/btop SSH terminal monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/gpu-ssh-monitor
+Environment=HOME=/root
+Environment=SSH_HOST=0.0.0.0
+Environment=SSH_PORT=23234
+Environment=SSH_SNAPSHOT_MS=500
+Environment=DASHBOARD_WORKDIR=/opt/gpu-ssh-monitor
+Environment=DASHBOARD_CMD=/usr/bin/node
+ExecStart=/opt/gpu-ssh-monitor/gpu-ssh-monitor
+Restart=always
+RestartSec=2
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target
