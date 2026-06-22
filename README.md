@@ -12,8 +12,8 @@ fixed-size TUI dashboard composed from `nvitop` and `btop`.
 - top 21 rows: `nvitop`
 - bottom 48 rows: `btop`
 - concurrent SSH sessions share one dashboard source
-- stdin is only used to exit with `q` or `Ctrl-C`; it is not forwarded to
-  `nvitop` or `btop`
+- stdin is only used for monitor controls: `r` redraws the current client,
+  `q` or `Ctrl-C` exits; it is not forwarded to `nvitop` or `btop`
 - no dashboard collector runs when nobody is connected
 - color-preserving differential terminal updates to reduce flicker
 

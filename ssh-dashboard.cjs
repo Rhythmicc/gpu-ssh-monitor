@@ -165,21 +165,27 @@ function writeFrame() {
   isWritingFrame = true;
 
   try {
-    const nvitopSnapshot = sanitizeSnapshot(paneSessions.nvitop.mirror.snapshot());
-    let btopSnapshot = sanitizeSnapshot(paneSessions.btop.mirror.snapshot());
-    const nvitopTime = snapshotTime(nvitopSnapshot);
-    const btopTime = snapshotTime(btopSnapshot);
-    const now = Date.now();
-
-    if (nvitopTime && btopTime && nvitopTime !== btopTime) {
-      btopSnapshot = btopSnapshot.replace(btopTime, nvitopTime);
-    }
-
-    writeDiffFrame(nvitopSnapshot, btopSnapshot);
-    lastRenderedAt = now;
+    writeFrameLines(currentFrameLines());
+    lastRenderedAt = Date.now();
   } finally {
     isWritingFrame = false;
   }
+}
+
+function currentFrameLines() {
+  const nvitopSnapshot = sanitizeSnapshot(paneSessions.nvitop.mirror.snapshot());
+  let btopSnapshot = sanitizeSnapshot(paneSessions.btop.mirror.snapshot());
+  const nvitopTime = snapshotTime(nvitopSnapshot);
+  const btopTime = snapshotTime(btopSnapshot);
+
+  if (nvitopTime && btopTime && nvitopTime !== btopTime) {
+    btopSnapshot = btopSnapshot.replace(btopTime, nvitopTime);
+  }
+
+  return [
+    ...snapshotLines(nvitopSnapshot, NVITOP_ROWS),
+    ...snapshotLines(btopSnapshot, BTOP_ROWS),
+  ];
 }
 
 function snapshotLines(snapshot, rows) {
@@ -188,12 +194,7 @@ function snapshotLines(snapshot, rows) {
   return lines.slice(0, rows);
 }
 
-function writeDiffFrame(nvitopSnapshot, btopSnapshot) {
-  const nextFrameLines = [
-    ...snapshotLines(nvitopSnapshot, NVITOP_ROWS),
-    ...snapshotLines(btopSnapshot, BTOP_ROWS),
-  ];
-
+function writeFrameLines(nextFrameLines) {
   for (const client of clients) {
     writeDiffFrameToClient(client, nextFrameLines);
   }
@@ -215,6 +216,13 @@ function writeDiffFrameToClient(client, nextFrameLines) {
 
   client.previousFrameLines = nextFrameLines;
   if (output) client.stream.write(output);
+}
+
+function refreshClient(client) {
+  if (client.stream.destroyed) return;
+  client.previousFrameLines = [];
+  client.stream.write("\x1b[?25l\x1b[2J\x1b[H");
+  writeDiffFrameToClient(client, currentFrameLines());
 }
 
 function shutdown() {
@@ -267,6 +275,11 @@ function addClient(stream) {
   clients.add(client);
 
   stream.write("\x1b[?1049h\x1b[?25l\x1b[2J\x1b[H");
+  stream.on("data", (data) => {
+    for (const byte of data) {
+      if (byte === 0x72 || byte === 0x52) refreshClient(client);
+    }
+  });
   stream.on("error", () => clients.delete(client));
   stream.on("close", () => clients.delete(client));
   writeFrame();

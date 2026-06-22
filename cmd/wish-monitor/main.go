@@ -241,8 +241,8 @@ func dashboardMiddleware(dashboard *dashboardDaemon) wish.Middleware {
 				copyDone <- err
 			}()
 
-			inputDone := make(chan struct{})
-			go watchExitKeys(session, inputDone)
+			actions := make(chan sessionAction)
+			go watchSessionKeys(session, actions)
 
 			signals := make(chan ssh.Signal, 8)
 			session.Signals(signals)
@@ -250,26 +250,46 @@ func dashboardMiddleware(dashboard *dashboardDaemon) wish.Middleware {
 			signalDone := make(chan struct{})
 			go watchExitSignals(signals, signalDone)
 
-			select {
-			case <-session.Context().Done():
-				_ = conn.Close()
-			case <-inputDone:
-				_ = conn.Close()
-				restoreTerminal(session)
-				_ = session.Exit(0)
-			case <-signalDone:
-				_ = conn.Close()
-				restoreTerminal(session)
-				_ = session.Exit(0)
-			case err := <-copyDone:
-				if err != nil {
-					_ = session.Exit(1)
+			for {
+				select {
+				case <-session.Context().Done():
+					_ = conn.Close()
+					return
+				case action, ok := <-actions:
+					if !ok {
+						continue
+					}
+					switch action {
+					case actionRefresh:
+						_, _ = conn.Write([]byte("r"))
+					case actionExit:
+						_ = conn.Close()
+						restoreTerminal(session)
+						_ = session.Exit(0)
+						return
+					}
+				case <-signalDone:
+					_ = conn.Close()
+					restoreTerminal(session)
+					_ = session.Exit(0)
+					return
+				case err := <-copyDone:
+					if err != nil {
+						_ = session.Exit(1)
+					}
 					return
 				}
 			}
 		}
 	}
 }
+
+type sessionAction int
+
+const (
+	actionExit sessionAction = iota
+	actionRefresh
+)
 
 func restoreTerminal(writer io.Writer) {
 	_, _ = writer.Write([]byte("\x1b[?25h\x1b[?1049l"))
@@ -284,7 +304,8 @@ func watchExitSignals(signals <-chan ssh.Signal, done chan<- struct{}) {
 	}
 }
 
-func watchExitKeys(reader io.Reader, done chan<- struct{}) {
+func watchSessionKeys(reader io.Reader, actions chan<- sessionAction) {
+	defer close(actions)
 	buf := make([]byte, 32)
 	for {
 		n, err := reader.Read(buf)
@@ -294,8 +315,11 @@ func watchExitKeys(reader io.Reader, done chan<- struct{}) {
 
 		for _, b := range buf[:n] {
 			if b == 0x03 || b == 'q' || b == 'Q' {
-				close(done)
+				actions <- actionExit
 				return
+			}
+			if b == 'r' || b == 'R' {
+				actions <- actionRefresh
 			}
 		}
 	}
